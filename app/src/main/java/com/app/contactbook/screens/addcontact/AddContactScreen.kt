@@ -135,7 +135,7 @@ fun AddContactScreen(navController: NavHostController) {
             Button(
                 onClick = {
                     // Save logic yahan add hoga
-                    navController.popBackStack()
+                    navController.navigate("contact_saved")
                 },
                 modifier = Modifier
                     .fillMaxWidth()

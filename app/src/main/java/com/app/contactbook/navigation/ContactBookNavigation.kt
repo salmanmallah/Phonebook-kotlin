@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import com.app.contactbook.screens.addcontact.AddContactScreen
 import com.app.contactbook.screens.home.HomeScreen
 import com.app.contactbook.screens.viewcontacts.ViewContactsScreen
+import com.app.contactbook.screens.success.ContactSavedScreen
 
 @Composable
 fun ContactBookNavHost(navController: NavHostController) {
@@ -92,6 +93,36 @@ fun ContactBookNavHost(navController: NavHostController) {
             }
         ) { 
             ViewContactsScreen() 
+        }
+        
+        composable(
+            route = "contact_saved",
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            }
+        ) { 
+            ContactSavedScreen(navController) 
         }
     }
 }
