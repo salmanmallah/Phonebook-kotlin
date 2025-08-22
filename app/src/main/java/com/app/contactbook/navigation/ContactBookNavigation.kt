@@ -1,5 +1,7 @@
 package com.app.contactbook.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -10,9 +12,86 @@ import com.app.contactbook.screens.viewcontacts.ViewContactsScreen
 
 @Composable
 fun ContactBookNavHost(navController: NavHostController) {
-    NavHost(navController = navController, startDestination = "home") {
-        composable("home") { HomeScreen(navController) }
-        composable("add_contact") { AddContactScreen(navController) }
-        composable("view_contacts") { ViewContactsScreen() }
+    NavHost(
+        navController = navController, 
+        startDestination = "home"
+    ) {
+        composable(
+            route = "home",
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800)
+                )
+            }
+        ) { 
+            HomeScreen(navController) 
+        }
+        
+        composable(
+            route = "add_contact",
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            }
+        ) { 
+            AddContactScreen(navController) 
+        }
+        
+        composable(
+            route = "view_contacts",
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            }
+        ) { 
+            ViewContactsScreen() 
+        }
     }
 }
