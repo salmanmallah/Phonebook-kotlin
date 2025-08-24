@@ -98,3 +98,7 @@ lint/tmp/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+.idea/
+gradle.xml
+*.iml
+.idea/

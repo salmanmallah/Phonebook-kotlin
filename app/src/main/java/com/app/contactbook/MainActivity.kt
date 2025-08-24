@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
         // Initialize database
         DatabaseFactory.initializeDatabase(this)
         
-        enableEdgeToEdge()
+//        enableEdgeToEdge()
         setContent {
             ContactBookTheme {
                 Surface(
