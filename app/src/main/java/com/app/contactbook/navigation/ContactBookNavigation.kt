@@ -10,9 +10,15 @@ import com.app.contactbook.screens.addcontact.AddContactScreen
 import com.app.contactbook.screens.home.HomeScreen
 import com.app.contactbook.screens.viewcontacts.ViewContactsScreen
 import com.app.contactbook.screens.success.ContactSavedScreen
+import com.app.contactbook.screens.editcontact.EditContactScreen
+import com.app.contactbook.data.database.DatabaseFactory
+import androidx.compose.runtime.remember
 
 @Composable
 fun ContactBookNavHost(navController: NavHostController) {
+    // Get ViewModel from DatabaseFactory
+    val viewModel = remember { DatabaseFactory.getViewModel(navController.context) }
+    
     NavHost(
         navController = navController, 
         startDestination = "home"
@@ -32,7 +38,7 @@ fun ContactBookNavHost(navController: NavHostController) {
                 )
             }
         ) { 
-            HomeScreen(navController) 
+            HomeScreen(navController, viewModel) 
         }
         
         composable(
@@ -62,7 +68,7 @@ fun ContactBookNavHost(navController: NavHostController) {
                 )
             }
         ) { 
-            AddContactScreen(navController) 
+            AddContactScreen(navController, viewModel) 
         }
         
         composable(
@@ -92,7 +98,7 @@ fun ContactBookNavHost(navController: NavHostController) {
                 )
             }
         ) { 
-            ViewContactsScreen() 
+            ViewContactsScreen(navController, viewModel) 
         }
         
         composable(
@@ -123,6 +129,45 @@ fun ContactBookNavHost(navController: NavHostController) {
             }
         ) { 
             ContactSavedScreen(navController) 
+        }
+        
+        // Edit Contact Route
+        composable(
+            route = "edit_contact/{contactId}",
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(800, easing = androidx.compose.animation.core.EaseInOut)
+                )
+            }
+        ) { backStackEntry ->
+            val contactId = backStackEntry.arguments?.getString("contactId")?.toIntOrNull() ?: 0
+            val contact = viewModel.contacts.value.find { it.id == contactId }
+            
+            if (contact != null) {
+                EditContactScreen(navController, viewModel, contact)
+            } else {
+                // Handle contact not found
+                navController.popBackStack()
+            }
         }
     }
 }

@@ -13,10 +13,15 @@ import androidx.compose.ui.Modifier
 import com.app.contactbook.navigation.ContactBookNavHost
 import com.app.contactbook.ui.theme.ContactBookTheme
 import androidx.navigation.compose.rememberNavController
+import com.app.contactbook.data.database.DatabaseFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize database
+        DatabaseFactory.initializeDatabase(this)
+        
         enableEdgeToEdge()
         setContent {
             ContactBookTheme {

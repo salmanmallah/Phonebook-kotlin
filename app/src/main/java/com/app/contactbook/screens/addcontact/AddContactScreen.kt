@@ -16,10 +16,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
+import androidx.navigation.NavController
+import com.app.contactbook.ui.viewmodel.ContactViewModel
 
 @Composable
-fun AddContactScreen(navController: NavHostController) {
+fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -134,8 +135,11 @@ fun AddContactScreen(navController: NavHostController) {
         ) {
             Button(
                 onClick = {
-                    // Save logic yahan add hoga
-                    navController.navigate("contact_saved")
+                    // Real save logic
+                    if (name.isNotBlank() && phone.isNotBlank()) {
+                        viewModel.addContact(name, phone, email)
+                        navController.navigate("contact_saved")
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
