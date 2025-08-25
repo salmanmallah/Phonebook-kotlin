@@ -42,52 +42,70 @@ fun ViewContactsScreen(navController: NavController, viewModel: ContactViewModel
     val contacts by viewModel.contacts.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Header Section
-        HeaderSection()
-        
-        // Real contact count
-        Text(
-            text = "${contacts.size} contacts in your phonebook",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Search Bar
-        SearchBarSection(
-            searchQuery = searchQuery,
-            onSearchQueryChange = { 
-                searchQuery = it
-                viewModel.searchContacts(it)
-            }
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Contacts List
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            ContactsListSection(
-                contacts = contacts,
-                onContactClick = { contact ->
-                    showActionMenu = contact
-                },
-                viewModel = viewModel
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Header Section
+            HeaderSection()
+            
+            // Real contact count
+            Text(
+                text = "${contacts.size} contacts in your phonebook",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Search Bar
+            SearchBarSection(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { 
+                    searchQuery = it
+                    viewModel.searchContacts(it)
+                }
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Contacts List
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                ContactsListSection(
+                    contacts = contacts,
+                    onContactClick = { contact ->
+                        showActionMenu = contact
+                    },
+                    viewModel = viewModel
+                )
+            }
+        }
+
+        // FAB at bottom end with padding like system contacts app
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 70.dp, end = 30.dp), // More padding for floating look
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            FloatingActionButton(
+                onClick = { navController.navigate("add_contact") },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.secondary
+            ) {
+                Icon(Icons.Filled.Add, "Add contact")
+            }
         }
     }
     

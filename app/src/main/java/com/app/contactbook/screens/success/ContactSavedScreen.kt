@@ -26,7 +26,7 @@ fun ContactSavedScreen(navController: NavHostController) {
         animationSpec = tween(500, easing = EaseOutBack),
         label = "scale"
     )
-    
+
     // Auto redirect after 2 seconds
     LaunchedEffect(Unit) {
         delay(500) // Start animation after 500ms
