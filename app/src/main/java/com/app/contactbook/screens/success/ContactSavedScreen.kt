@@ -31,7 +31,7 @@ fun ContactSavedScreen(navController: NavHostController) {
     LaunchedEffect(Unit) {
         delay(500) // Start animation after 500ms
         showAnimation = true
-        delay(2000) // Wait 2 seconds
+        delay(500) // Wait 2 seconds
         navController.navigate("home") {
             popUpTo("home") { inclusive = true }
         }
