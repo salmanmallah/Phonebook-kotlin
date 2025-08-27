@@ -4,79 +4,88 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.app.contactbook.ui.viewmodel.ContactViewModel
 import com.app.contactbook.data.entity.ContactEntity
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import com.app.contactbook.ui.viewmodel.ContactViewModel
 import com.app.contactbook.utils.IntentHelper
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 @Composable
 fun ViewContactsScreen(navController: NavController, viewModel: ContactViewModel) {
-    var searchQuery by remember { mutableStateOf("") }
-    var showActionMenu by remember { mutableStateOf<ContactEntity?>(null) }
-    
-    // Get context for intents
+    // --- UI states ---
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    // sirf id store karo to prevent heavy object comparisons
+    var selectedContactId by remember { mutableStateOf<Int?>(null) }
+
     val context = LocalContext.current
-    
-    // Get real contacts from ViewModel
-    val contacts by viewModel.contacts.collectAsState()
+    val contacts by viewModel.contacts.collectAsState()     // keep as is; lifecycle variant optional
     val isLoading by viewModel.isLoading.collectAsState()
-    
-    Box(modifier = Modifier.fillMaxSize()) {
+
+    // Debounce search: less recompositions under typing
+    LaunchedEffect(Unit) {
+        snapshotFlow { searchQuery }
+            .map { it.trim() }
+            .distinctUntilChanged()
+            .debounce(300)
+            .collect { q -> viewModel.searchContacts(q) }
+    }
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // --- Screen ---
+    Box(Modifier.fillMaxSize()) {
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Header Section
             HeaderSection()
-            
-            // Real contact count
+
             Text(
                 text = "${contacts.size} contacts in your phonebook",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 8.dp)
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Search Bar
+
             SearchBarSection(
                 searchQuery = searchQuery,
-                onSearchQueryChange = { 
-                    searchQuery = it
-                    viewModel.searchContacts(it)
-                }
+                onSearchQueryChange = { searchQuery = it }
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Contacts List
+
+            Spacer(Modifier.height(8.dp))
+
             if (isLoading) {
                 Box(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -84,56 +93,49 @@ fun ViewContactsScreen(navController: NavController, viewModel: ContactViewModel
             } else {
                 ContactsListSection(
                     contacts = contacts,
-                    onContactClick = { contact ->
-                        showActionMenu = contact
+                    listState = listState,
+                    onContactClick = { contact -> selectedContactId = contact.id },
+                    onCall = { phone ->
+                        try { IntentHelper.makePhoneCall(context, phone) }
+                        catch (_: Exception) { IntentHelper.openDialer(context, phone) }
                     },
-                    viewModel = viewModel
+                    onSms = { phone -> IntentHelper.openSMSApp(context, phone) },
+                    onToggleFav = { c -> viewModel.toggleFavorite(c) }
                 )
             }
         }
 
-        // FAB at bottom end with padding like system contacts app
-        Box(
+        // FAB
+        FloatingActionButton(
+            onClick = { navController.navigate("add_contact") },
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.secondary,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 70.dp, end = 30.dp), // More padding for floating look
-            contentAlignment = Alignment.BottomEnd
+                .align(Alignment.BottomEnd)
+                .padding(24.dp)
         ) {
-            FloatingActionButton(
-                onClick = { navController.navigate("add_contact") },
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.secondary
-            ) {
-                Icon(Icons.Filled.Add, "Add contact")
-            }
+            Icon(Icons.Filled.Add, contentDescription = "Add contact")
         }
     }
-    
-    // Action Menu Bottom Sheet
-    if (showActionMenu != null) {
+
+    // --- Bottom Sheet (cheap toggling via id) ---
+    val selected = remember(selectedContactId, contacts) {
+        contacts.firstOrNull { it.id == selectedContactId }
+    }
+    if (selected != null) {
         ContactActionMenu(
-            contact = showActionMenu!!,
+            contact = selected,
             navController = navController,
-            onDismiss = { showActionMenu = null },
-            onCall = { 
-                try {
-                    // Try direct call first
-                    IntentHelper.makePhoneCall(context, showActionMenu!!.phone)
-                } catch (e: Exception) {
-                    // Fallback to dialer if call fails
-                    IntentHelper.openDialer(context, showActionMenu!!.phone)
-                }
-                showActionMenu = null
+            onDismiss = { selectedContactId = null },
+            onCall = {
+                try { IntentHelper.makePhoneCall(context, selected.phone) }
+                catch (_: Exception) { IntentHelper.openDialer(context, selected.phone) }
             },
-            onSMS = { 
-                IntentHelper.openSMSApp(context, showActionMenu!!.phone)
-                showActionMenu = null
-            },
-            onEmail = { 
-                if (showActionMenu!!.email.isNotEmpty()) {
-                    IntentHelper.sendEmail(context, showActionMenu!!.email)
+            onSMS = { IntentHelper.openSMSApp(context, selected.phone) },
+            onEmail = {
+                if (selected.email.isNotEmpty()) {
+                    IntentHelper.sendEmail(context, selected.email)
                 }
-                showActionMenu = null
             }
         )
     }
@@ -141,19 +143,16 @@ fun ViewContactsScreen(navController: NavController, viewModel: ContactViewModel
 
 @Composable
 fun HeaderSection() {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "All Contacts",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        
-        // Real contact count will be shown in main function
-    }
+    Text(
+        text = "All Contacts",
+        fontSize = 26.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 4.dp),
+        textAlign = TextAlign.Center
+    )
 }
 
 @Composable
@@ -171,7 +170,6 @@ fun SearchBarSection(
             Icon(
                 imageVector = Icons.Filled.Search,
                 contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.primary
             )
         },
         trailingIcon = {
@@ -179,16 +177,11 @@ fun SearchBarSection(
                 IconButton(onClick = { onSearchQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Filled.Clear,
-                        contentDescription = "Clear search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        contentDescription = "Clear search"
                     )
                 }
             }
         },
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-        ),
         shape = RoundedCornerShape(12.dp)
     )
 }
@@ -196,23 +189,35 @@ fun SearchBarSection(
 @Composable
 fun ContactsListSection(
     contacts: List<ContactEntity>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     onContactClick: (ContactEntity) -> Unit,
-    viewModel: ContactViewModel
+    onCall: (String) -> Unit,
+    onSms: (String) -> Unit,
+    onToggleFav: (ContactEntity) -> Unit
 ) {
     if (contacts.isEmpty()) {
         EmptyContactsState()
-    } else {
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(contacts) { contact ->
-                ContactItem(
-                    contact = contact,
-                    onClick = { onContactClick(contact) },
-                    viewModel = viewModel
-                )
-            }
+        return
+    }
+
+    LazyColumn(
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 88.dp), // avoid FAB overlap
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(
+            items = contacts,
+            key = { it.id },                 // stable key
+            contentType = { "contact_item" } // helps recycler reuse
+        ) { contact ->
+            ContactItem(
+                contact = contact,
+                onClick = { onContactClick(contact) },
+                onCall = onCall,
+                onSms = onSms,
+                onToggleFav = onToggleFav
+            )
         }
     }
 }
@@ -221,165 +226,125 @@ fun ContactsListSection(
 fun ContactItem(
     contact: ContactEntity,
     onClick: () -> Unit,
-    viewModel: ContactViewModel
+    onCall: (String) -> Unit,
+    onSms: (String) -> Unit,
+    onToggleFav: (ContactEntity) -> Unit
 ) {
+    // Light memoization for text pieces
+    val initial by remember(contact.id, contact.name) {
+        mutableStateOf(contact.name.take(1).uppercase())
+    }
+
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Contact Avatar
-            ContactAvatar(contact = contact)
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Contact Details
+            // Avatar (no extra Box layering)
             Box(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
             ) {
-                ContactDetails(contact = contact)
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Action Icons
-            ContactActionIcons(contact = contact, viewModel = viewModel)
-        }
-    }
-}
-
-@Composable
-fun ContactAvatar(contact: ContactEntity) {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = contact.name.take(1).uppercase(),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-    }
-}
-
-@Composable
-fun ContactDetails(contact: ContactEntity) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = contact.name,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            if (contact.isFavorite) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = "Favorite",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                Text(
+                    text = initial,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
-        }
-        
-        Spacer(modifier = Modifier.height(4.dp))
-        
-        Text(
-            text = contact.phone,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        
-        if (contact.email.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = contact.email,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = contact.name,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (contact.isFavorite) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Favorite",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(2.dp))
+
+                Text(
+                    text = contact.phone,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (contact.email.isNotEmpty()) {
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        text = contact.email,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            ContactActionIcons(
+                contact = contact,
+                onCall = onCall,
+                onSms = onSms,
+                onToggleFav = onToggleFav
             )
         }
     }
 }
 
 @Composable
-fun ContactActionIcons(contact: ContactEntity, viewModel: ContactViewModel) {
-    val context = LocalContext.current
-    
+fun ContactActionIcons(
+    contact: ContactEntity,
+    onCall: (String) -> Unit,
+    onSms: (String) -> Unit,
+    onToggleFav: (ContactEntity) -> Unit
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        IconButton(
-            onClick = { 
-                try {
-                    IntentHelper.makePhoneCall(context, contact.phone)
-                } catch (e: Exception) {
-                    IntentHelper.openDialer(context, contact.phone)
-                }
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Call,
-                contentDescription = "Call",
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+        IconButton(onClick = { onCall(contact.phone) }, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Filled.Call, contentDescription = "Call", modifier = Modifier.size(18.dp))
         }
-        
-        IconButton(
-            onClick = { 
-                IntentHelper.openSMSApp(context, contact.phone)
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Sms,
-                contentDescription = "SMS",
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+        IconButton(onClick = { onSms(contact.phone) }, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Filled.Sms, contentDescription = "SMS", modifier = Modifier.size(18.dp))
         }
-        
-        // Favorite Toggle
-        IconButton(
-            onClick = { 
-                viewModel.toggleFavorite(contact)
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
+        IconButton(onClick = { onToggleFav(contact) }, modifier = Modifier.size(32.dp)) {
             Icon(
                 imageVector = if (contact.isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
                 contentDescription = "Toggle Favorite",
                 modifier = Modifier.size(18.dp),
-                tint = if (contact.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (contact.isFavorite) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -389,28 +354,25 @@ fun ContactActionIcons(contact: ContactEntity, viewModel: ContactViewModel) {
 fun EmptyContactsState() {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Icon(
                 imageVector = Icons.Filled.PersonOff,
                 contentDescription = "No contacts",
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(56.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
             Text(
                 text = "No contacts found",
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
+                fontWeight = FontWeight.Medium
             )
-            
             Text(
                 text = "Try adding some contacts or check your search query",
                 fontSize = 14.sp,
@@ -431,116 +393,71 @@ fun ContactActionMenu(
     onSMS: () -> Unit,
     onEmail: () -> Unit
 ) {
-    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current // Fixed: Moved to Composable level
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
+        sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Contact Info Header
-            ContactAvatar(contact = contact)
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = contact.name,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            
-            Text(
-                text = contact.phone,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Action Buttons
-            ActionButton(
-                text = "Call",
-                icon = Icons.Filled.Call,
-                onClick = {
-                    onCall()
-                    onDismiss()
-                },
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            ActionButton(
-                text = "Send SMS",
-                icon = Icons.Filled.Sms,
-                onClick = {
-                    onSMS()
-                    onDismiss()
-                },
-                containerColor = MaterialTheme.colorScheme.secondary
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            ActionButton(
-                text = "Send Email",
-                icon = Icons.Filled.Email,
-                onClick = {
-                    onEmail()
-                    onDismiss()
-                },
-                containerColor = MaterialTheme.colorScheme.tertiary
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Share Contact Button
-            ActionButton(
-                text = "Share Contact",
-                icon = Icons.Filled.Share,
-                onClick = {
-                    IntentHelper.shareContact(
-                        context, 
-                        contact.name, 
-                        contact.phone, 
-                        contact.email
-                    )
-                    onDismiss()
-                },
-                containerColor = MaterialTheme.colorScheme.secondary
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Edit Contact Button
-            ActionButton(
-                text = "Edit Contact",
-                icon = Icons.Filled.Edit,
-                onClick = {
-                    navController.navigate("edit_contact/${contact.id}")
-                    onDismiss()
-                },
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Cancel Button
+            // Avatar + name
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = contact.name.take(1).uppercase(),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(contact.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(contact.phone, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Spacer(Modifier.height(18.dp))
+
+            ActionButton("Call", Icons.Filled.Call) { onCall(); onDismiss() }
+            Spacer(Modifier.height(10.dp))
+            ActionButton("Send SMS", Icons.Filled.Sms) { onSMS(); onDismiss() }
+            Spacer(Modifier.height(10.dp))
+            ActionButton("Send Email", Icons.Filled.Email) { onEmail(); onDismiss() }
+            Spacer(Modifier.height(10.dp))
+            ActionButton("Share Contact", Icons.Filled.Share) {
+                // Fixed: Now context is available from the Composable scope
+                IntentHelper.shareContact(
+                    context,
+                    contact.name, contact.phone, contact.email
+                )
+                onDismiss()
+            }
+            Spacer(Modifier.height(10.dp))
+            ActionButton("Edit Contact", Icons.Filled.Edit) {
+                navController.navigate("edit_contact/${contact.id}")
+                onDismiss()
+            }
+
+            Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Cancel")
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
+            ) { Text("Cancel") }
+
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
@@ -549,24 +466,15 @@ fun ContactActionMenu(
 fun ActionButton(
     text: String,
     icon: ImageVector,
-    onClick: () -> Unit,
-    containerColor: androidx.compose.ui.graphics.Color
+    onClick: () -> Unit
 ) {
     Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor
-        ),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            modifier = Modifier
-                .size(20.dp)
-                .padding(end = 8.dp)
-        )
+        Icon(icon, contentDescription = text, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
         Text(text)
     }
 }

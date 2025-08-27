@@ -6,7 +6,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
@@ -44,13 +46,12 @@ fun TopSlideSnackbar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            contentAlignment = Alignment.TopCenter // Center horizontally at top
+            contentAlignment = Alignment.TopCenter
         ) {
             Surface(
                 color = MaterialTheme.colorScheme.primary,
                 shape = MaterialTheme.shapes.medium,
-                shadowElevation = 4.dp,
-                modifier = Modifier.align(Alignment.TopCenter) // Center surface
+                shadowElevation = 4.dp
             ) {
                 Text(
                     text = message,
@@ -60,6 +61,7 @@ fun TopSlideSnackbar(
             }
         }
     }
+
     if (show) {
         LaunchedEffect(Unit) {
             delay(2000)
@@ -67,6 +69,7 @@ fun TopSlideSnackbar(
         }
     }
 }
+
 
 @Composable
 fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) {
@@ -79,53 +82,52 @@ fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 24.dp, vertical = 32.dp), // Balanced padding
+            verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Section
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            Text(
-                text = "Add New Contact",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            Text(
-                text = "Enter contact details below",
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
+            // -------- Header Section --------
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Add New Contact",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
 
-            // Form Section
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Enter contact details below",
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // -------- Form Section --------
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f), // Take available middle space
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Name Field
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
                         label = { Text("Full Name") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        ),
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Person,
@@ -135,17 +137,12 @@ fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) 
                         }
                     )
 
-                    // Phone Field
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { phone = it },
                         label = { Text("Phone Number") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        ),
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Phone,
@@ -155,17 +152,12 @@ fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) 
                         }
                     )
 
-                    // Email Field
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text("Email (Optional)") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        ),
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Email,
@@ -177,9 +169,7 @@ fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) 
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Buttons Section
+            // -------- Buttons Section --------
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -194,23 +184,19 @@ fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) 
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = "Save",
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Text(
-                        "Save Contact",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("Save Contact", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
-                
+
                 OutlinedButton(
                     onClick = { navController.popBackStack() },
                     modifier = Modifier
@@ -226,16 +212,12 @@ fun AddContactScreen(navController: NavController, viewModel: ContactViewModel) 
                         contentDescription = "Cancel",
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Text(
-                        "Cancel",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("Cancel", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
             }
-            
-            Spacer(modifier = Modifier.height(32.dp))
         }
+
+        // Snackbar
         TopSlideSnackbar(
             message = "Contact Saved Successfully!",
             show = showSnackbar,
